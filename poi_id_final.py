@@ -4,17 +4,14 @@ import pandas as pd
 import numpy as np
 import sys
 import pickle
-sys.path.append("../tools/")
 from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.feature_selection import chi2
 from feature_format import featureFormat, targetFeatureSplit
-from tester import dump_classifier_and_data
-import seaborn as sns
+from tester import dump_classifier_and_data, test_classifier, load_classifier_and_data
+from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.decomposition import PCA
@@ -22,7 +19,6 @@ from sklearn.decomposition import PCA as RandomizedPCA
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
-from operator import itemgetter
 from sklearn.metrics import classification_report
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -34,7 +30,7 @@ from sklearn.svm import SVC
 ### First analyze the dataset to select the features and use selectK best to identify the most important features
 ### Using pandas to do this
 
-data = pd.read_csv("../final_project/enron_dataset2.csv", index_col = 0 )
+data = pd.read_csv("enron_dataset2.csv", index_col = 0 )
 
 ### Drop columns that have categorical data and columns that have more than 50% NaNs, we check these columns as below
 #print(data.isnull().sum())
@@ -61,7 +57,7 @@ features_scores.columns = ['features ', 'scores']
 
 ### From the top 5 features gotten we add them to our features list
 
-features_list = ['poi', 'exercised_stock_options','total_stock_value','bonus', 'salary','deferred_income'] # You will need to use more features
+features_list = ['poi', 'bonus','exercised_stock_options','total_stock_value', 'salary','deferred_income'] # You will need to use more features
 
 ### Load the dictionary containing the dataset
 data_dict = pickle.load(open("final_project_dataset_unix.pkl", "rb") )
@@ -93,7 +89,7 @@ for person in data_dict:
         data_dict[person]["total_amount"] = "NaN"
 newd = pd.DataFrame(data_dict)
 newdata = newd.T
-data = newdata.to_csv("../final_project/enron_datasetNF.csv")
+data = newdata.to_csv("enron_datasetNF.csv")
 
 ### Add the two new features created into our features_list list
 features_list.append("total_amount")
@@ -106,61 +102,6 @@ my_dataset = data_dict
 data = featureFormat(data_dict, features_list, sort_keys = True)
 labels, features = targetFeatureSplit(data)
 
-
-
-### Task 5: Tune your classifier to achieve better than .3 precision and recall
-### using our testing script. Check the tester.py script in the final project
-### folder for details on the evaluation method, especially the test_classifier
-### function. Because of the small size of the dataset, the script uses
-### stratified shuffle split cross validation. For more info: 
-### http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
-
-# Example starting point. Try investigating other evaluation techniques!
-### In this place, I have decided to create a function that will be called so that i can test through all classifiers using the best features
-
-def select_best_classifier(n_features, features, labels):
-    clf_list = []
-    select_best = SelectKBest(f_classif, k=n_features)
-    features = select_best.fit_transform(features, labels)
-    scores = select_best.scores_
-    features_train, features_test, labels_train, labels_test = train_test_split(features, labels, test_size=0.3, random_state=42)
-    #NB = GaussianNB()
-    # dt = DecisionTreeClassifier()
-    # parameters1 = {"criterion": ["gini", "entropy"],
-    #               "min_samples_split":[2,3,4,5,6,7],
-    #               "max_features": ["auto", "log2","sqrt",None]}
-    rf = RandomForestClassifier()
-    parameters2 = {'min_samples_split': [2, 3, 4, 5, 6, 7],
-                  'max_features': ['auto', 'sqrt', 'log2', None],
-                  'criterion': ['gini', 'entropy'],
-                  'n_estimators': [2, 3, 4, 5, 6, 7]}
-    # svm = SVC()
-    # parameters3 = {'kernel': ['rbf'],
-    #               'C': [1, 10, 100, 1000, 10000, 100000]}
-    clf = GridSearchCV(rf, parameters2)
-    clf.fit(features_train,labels_train)
-    clf = clf.best_estimator_
-    pred = clf.predict(features_test)
-    accuracy = accuracy_score(pred, labels_test)
-    precision = precision_score(pred, labels_test)
-    recall = recall_score(pred, labels_test)
-
-    count = 0
-    for ele in labels_test:
-        if ele == 1.0:
-            count+=1
-    new = zip(labels_test,pred)
-    c = list(new)
-    count1 = 0
-    for elem in c:
-        a, b = elem
-        if a == 1.0 and b == 1.0:
-            count1+=1
-    clf_list.append([accuracy,precision,recall,n_features,scores,count,count1, clf])
-
-    return clf_list[::-1][0]
-
-
 ### Task 4: Try a varity of classifiers
 ### Please name your classifier clf for easy export below.
 ### Note that if you want to do PCA or other multi-stage operations,
@@ -168,43 +109,36 @@ def select_best_classifier(n_features, features, labels):
 ### http://scikit-learn.org/stable/modules/pipeline.html
 
 # Provided to give you a starting point. Try a variety of classifiers.
-clf_list2 = []
-for num in range(1,len(features_list)):
-    print(num,select_best_classifier(num,features, labels))
-    clf_list2.append(select_best_classifier(num,features, labels))
-print(clf_list2)
-order_clf_list = sorted(clf_list2, key=itemgetter(1, 2))  # order by f1-score and accuracy
-print(order_clf_list)
-final = order_clf_list[len(order_clf_list) - 1][7]
-print(final)
+# After trying various classifiers using the function below, the best classifier was found to be the decision tree classifier
 
-number_of_features = order_clf_list[len(order_clf_list) - 1][3]
-print(number_of_features)
+select_best = SelectKBest(f_classif, k=3)
+features = select_best.fit_transform(features, labels)
+features_train, features_test, labels_train, labels_test = train_test_split(features, labels, test_size=0.3, random_state=42)
+DT_classifier = DecisionTreeClassifier(criterion = "entropy", random_state = 42)
 
-print('Features and scores: ')
-score_list = order_clf_list[len(order_clf_list) - 1][4]
-print(score_list)
-features = features_list[1:]
-features_scores = []
-i = 0
-for feature in features:
-    features_scores.append([feature, score_list[i]])
-    i += 1
-features_scores = sorted(features_scores, key=itemgetter(1))
-print(features_scores[::-1])
+### Task 5: Tune your classifier to achieve better than .3 precision and recall
+### using our testing script. Check the tester.py script in the final project
+### folder for details on the evaluation method, especially the test_classifier
+### function. Because of the small size of the dataset, the script uses
+### stratified shuffle split cross validation. For more info: 
+### http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
+# Example starting point. Try investigating other evaluation techniques!
+### In this place, I have decided to create a function that will be called so that i can test through all classifiers using the best features. The function is located in
+### the poi_id_main.py file. For simplicity i put in a separate file. After running the function on various classififcation algorithms and tuning it on various parameters,
+### I found out that the best classifieris the Decision tree classifier. It was also tuned to various parameters.
+### Also, there were three features that were used to achieve these results. These features include: exerceised_stock_options, total_stock_value and bonus.
+parameters1 = {"criterion": ["gini", "entropy"],
+              "min_samples_split":[2,3,4,5,6,7],
+              "max_features": ["auto", "log2","sqrt",None]}
+classifier = GridSearchCV(DT_classifier, parameters1)
+classifier.fit(features_train,labels_train)
+classifier = classifier.best_estimator_
 
-print ('Features used: ')
-new_features_list = []
-for feature in features_scores[::-1][:number_of_features]:
-    new_features_list.append(feature[0])
-print(new_features_list)
-new_features_list = ['poi'] + new_features_list
-print(new_features_list)
-
-
+test_classifier(classifier,my_dataset, features_list)
 ### Task 6: Dump your classifier, dataset, and features_list so anyone can
 ### check your results. You do not need to change anything below, but make sure
 ### that the version of poi_id.py that you submit can be run on its own and
 ### generates the necessary .pkl files for validating your results.
 
-dump_classifier_and_data(clf, my_dataset, features_list)
+dump_classifier_and_data(classifier, my_dataset, features_list)
+
