@@ -30,7 +30,7 @@ from sklearn.svm import SVC
 ### First analyze the dataset to select the features and use selectK best to identify the most important features
 ### Using pandas to do this
 
-data = pd.read_csv("enron_dataset2.csv", index_col = 0 )
+data = pd.read_csv("csv_files/enron_dataset2.csv", index_col = 0 )
 
 ### Drop columns that have categorical data and columns that have more than 50% NaNs, we check these columns as below
 #print(data.isnull().sum())
@@ -60,7 +60,7 @@ features_scores.columns = ['features ', 'scores']
 features_list = ['poi', 'bonus','exercised_stock_options','total_stock_value', 'salary','deferred_income'] # You will need to use more features
 
 ### Load the dictionary containing the dataset
-data_dict = pickle.load(open("final_project_dataset_unix.pkl", "rb") )
+data_dict = pickle.load(open("pickle_files/final_project_dataset_unix.pkl", "rb") )
 
 
 ### Task 2: Remove outliers

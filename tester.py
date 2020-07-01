@@ -15,7 +15,6 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score, accuracy_score, confusion_matrix
 from sklearn.model_selection import StratifiedShuffleSplit
-sys.path.append("../tools/")
 from feature_format import featureFormat, targetFeatureSplit
 import pickle
 
